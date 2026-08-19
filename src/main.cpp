@@ -1,18 +1,36 @@
 #include <iostream>
 #include "kv_store.h"
+#include "command.h"
 
 int main() {
     KVStore store;
+    std::string line;
 
-    store.put("name", "Sudipta");
-    store.put("language", "C++");
+    std::cout << "kv> ";
+    while (std::getline(std::cin, line)) {
+        Command cmd = parseCommand(line);
 
-    auto name = store.get("name");
-    std::cout << "name = " << (name ? *name : "NOT_FOUND") << std::endl;
+        switch (cmd.type) {
+            case CommandType::SET:
+                store.put(cmd.key, cmd.value);
+                std::cout << "OK" << std::endl;
+                break;
+            case CommandType::GET: {
+                auto val = store.get(cmd.key);
+                std::cout << (val ? *val : "NOT_FOUND") << std::endl;
+                break;
+            }
+            case CommandType::DELETE:
+                store.remove(cmd.key);
+                std::cout << "OK" << std::endl;
+                break;
+            case CommandType::UNKNOWN:
+                std::cout << "ERROR: unknown command" << std::endl;
+                break;
+        }
 
-    store.remove("language");
-    auto lang = store.get("language");
-    std::cout << "language = " << (lang ? *lang : "NOT_FOUND") << std::endl;
+        std::cout << "kv> ";
+    }
 
     return 0;
 }

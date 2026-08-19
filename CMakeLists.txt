@@ -7,4 +7,5 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_executable(distributed_kv
     src/main.cpp
     src/kv_store.cpp
+    src/command.cpp
 )
