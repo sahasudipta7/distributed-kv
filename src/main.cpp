@@ -27,6 +27,9 @@ int main() {
             case CommandType::UNKNOWN:
                 std::cout << "ERROR: unknown command" << std::endl;
                 break;
+            case CommandType::INVALID:
+                std::cout << "ERROR: missing arguments" << std::endl;
+                break;
         }
 
         std::cout << "kv> ";

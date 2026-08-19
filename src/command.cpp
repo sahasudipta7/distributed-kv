@@ -11,6 +11,10 @@ Command parseCommand(const std::string& line) {
     if (verb == "SET") {
         cmd.type = CommandType::SET;
         iss >> cmd.key;
+        if(cmd.key.empty()){
+            cmd.type = CommandType::INVALID;
+            return cmd;
+        }
         std::getline(iss, cmd.value);
         // trim leading space left by getline after the key
         if (!cmd.value.empty() && cmd.value[0] == ' ') {
@@ -19,10 +23,20 @@ Command parseCommand(const std::string& line) {
     } else if (verb == "GET") {
         cmd.type = CommandType::GET;
         iss >> cmd.key;
+        if(cmd.key.empty()){
+            cmd.type = CommandType::INVALID;
+        }
     } else if (verb == "DELETE") {
         cmd.type = CommandType::DELETE;
         iss >> cmd.key;
-    } else {
+        if(cmd.key.empty()){
+            cmd.type = CommandType::INVALID;
+        }
+    } 
+    else if (verb.empty()){
+        cmd.type = CommandType::INVALID;
+    }
+    else {
         cmd.type = CommandType::UNKNOWN;
     }
 

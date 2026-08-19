@@ -6,7 +6,8 @@ enum class CommandType {
     SET,
     GET,
     DELETE,
-    UNKNOWN
+    UNKNOWN,
+    INVALID
 };
 
 struct Command {
