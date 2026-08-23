@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 #include "../src/kv_store.h"
 #include "../src/command.h"
+#include <thread>
+#include <vector>
 
 // --- KVStore tests ---
 
@@ -75,4 +77,30 @@ TEST(CommandParserTest, SetWithNoKeyIsInvalid) {
 TEST(CommandParserTest, GetWithNoKeyIsInvalid) {
     Command cmd = parseCommand("GET");
     ASSERT_EQ(cmd.type, CommandType::INVALID);
+}
+
+TEST(KVStoreTest, ConcurrentWritesAndReadsDontCrash) {
+    KVStore store;
+    const int numThreads = 8;
+    const int opsPerThread = 1000;
+
+    std::vector<std::thread> threads;
+
+    for (int t = 0; t < numThreads; ++t) {
+        threads.emplace_back([&store, t, opsPerThread]() {
+            for (int i = 0; i < opsPerThread; ++i) {
+                std::string key = "key" + std::to_string(t);
+                store.put(key, std::to_string(i));
+                auto val = store.get(key);
+                store.remove(key);
+            }
+        });
+    }
+
+    for (auto& th : threads) {
+        th.join();
+    }
+
+    // If we get here without crashing/hanging, synchronization is working.
+    SUCCEED();
 }
