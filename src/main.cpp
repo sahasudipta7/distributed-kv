@@ -1,9 +1,10 @@
 #include <iostream>
 #include "kv_store.h"
 #include "command.h"
+#include "wal.h"
 
 int main() {
-    KVStore store;
+    KVStore store("kv.wal");   // <-- real WAL file, constructor takes a path now
     std::string line;
 
     std::cout << "kv> ";

@@ -1,43 +1,43 @@
 #include <gtest/gtest.h>
-#include "../src/kv_store.h"
-#include "../src/command.h"
 #include <thread>
 #include <vector>
+#include "../src/kv_store.h"
+#include "../src/command.h"
 
 // --- KVStore tests ---
 
 TEST(KVStoreTest, PutAndGet) {
-    KVStore store;
+    KVStore store("test_put_get.wal");
     store.put("name", "Sudipta");
     ASSERT_EQ(store.get("name").value(), "Sudipta");
 }
 
 TEST(KVStoreTest, UpdateExistingKey) {
-    KVStore store;
+    KVStore store("test_update.wal");
     store.put("name", "Sudipta");
     store.put("name", "Rahul");
     ASSERT_EQ(store.get("name").value(), "Rahul");
 }
 
 TEST(KVStoreTest, GetMissingKeyReturnsNullopt) {
-    KVStore store;
+    KVStore store("test_missing.wal");
     ASSERT_FALSE(store.get("missing").has_value());
 }
 
 TEST(KVStoreTest, DeleteExistingKey) {
-    KVStore store;
+    KVStore store("test_delete.wal");
     store.put("name", "Sudipta");
     ASSERT_TRUE(store.remove("name"));
     ASSERT_FALSE(store.get("name").has_value());
 }
 
 TEST(KVStoreTest, DeleteMissingKeyReturnsFalse) {
-    KVStore store;
+    KVStore store("test_delete_missing.wal");
     ASSERT_FALSE(store.remove("missing"));
 }
 
 TEST(KVStoreTest, EmptyValueIsStored) {
-    KVStore store;
+    KVStore store("test_empty_value.wal");
     store.put("key", "");
     ASSERT_TRUE(store.get("key").has_value());
     ASSERT_EQ(store.get("key").value(), "");
@@ -79,8 +79,10 @@ TEST(CommandParserTest, GetWithNoKeyIsInvalid) {
     ASSERT_EQ(cmd.type, CommandType::INVALID);
 }
 
+// --- Concurrency test ---
+
 TEST(KVStoreTest, ConcurrentWritesAndReadsDontCrash) {
-    KVStore store;
+    KVStore store("test_concurrent.wal");
     const int numThreads = 8;
     const int opsPerThread = 1000;
 
@@ -101,6 +103,5 @@ TEST(KVStoreTest, ConcurrentWritesAndReadsDontCrash) {
         th.join();
     }
 
-    // If we get here without crashing/hanging, synchronization is working.
     SUCCEED();
 }

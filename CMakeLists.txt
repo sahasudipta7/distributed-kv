@@ -9,6 +9,7 @@ add_executable(distributed_kv
     src/main.cpp
     src/kv_store.cpp
     src/command.cpp
+    src/wal.cpp
 )
 
 # ---- Tests ----
@@ -27,6 +28,7 @@ add_executable(kv_tests
     tests/kv_store_test.cpp
     src/kv_store.cpp
     src/command.cpp
+    src/wal.cpp
 )
 target_link_libraries(kv_tests gtest_main)
 
