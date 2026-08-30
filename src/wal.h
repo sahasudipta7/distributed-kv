@@ -1,7 +1,6 @@
 #pragma once
 
 #include <string>
-#include <fstream>
 #include <mutex>
 #include <functional>
 
@@ -23,6 +22,6 @@ private:
     void appendLine(const std::string& line);
 
     std::string filePath_;
-    std::ofstream file_;
+    int fd_;   // raw file descriptor, not an ofstream
     std::mutex mutex_;
 };
