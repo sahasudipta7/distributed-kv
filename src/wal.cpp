@@ -3,56 +3,12 @@
 #include <sstream>
 #include <fstream>
 
-#include <io.h>      // _open, _write, _close, _commit
-#include <fcntl.h>   // O_APPEND, O_CREAT, O_WRONLY
-#include <sys/stat.h> // S_IREAD, S_IWRITE
-
-
-WriteAheadLog::WriteAheadLog(const std::string& filePath)
-    : filePath_(filePath) {
-    // O_APPEND: always write at end of file
-    // O_CREAT:  create the file if it doesn't exist
-    // O_WRONLY: write-only
-    // O_BINARY: don't let Windows silently translate \n <-> \r\n on us
-    fd_ = _open(
-        filePath_.c_str(),
-        O_APPEND | O_CREAT | O_WRONLY | O_BINARY,
-        S_IREAD | S_IWRITE
-    );
-    if (fd_ == -1) {
-        throw std::runtime_error("Failed to open WAL file: " + filePath_);
-    }
-}
-
-WriteAheadLog::~WriteAheadLog() {
-    if (fd_ != -1) {
-        _close(fd_);
-    }
-}
-
-void WriteAheadLog::appendSet(const std::string& key, const std::string& value) {
-    appendLine("SET " + key + " " + value);
-}
-
-void WriteAheadLog::appendDelete(const std::string& key) {
-    appendLine("DELETE " + key);
-}
-
-#include "wal.h"
-#include <stdexcept>
-#include <sstream>
-#include <fstream>
-
-#include <io.h>      // _open, _write, _close, _commit
-#include <fcntl.h>   // O_APPEND, O_CREAT, O_WRONLY
-#include <sys/stat.h> // S_IREAD, S_IWRITE
+#include <io.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 
 WriteAheadLog::WriteAheadLog(const std::string& filePath)
     : filePath_(filePath) {
-    // O_APPEND: always write at end of file
-    // O_CREAT:  create the file if it doesn't exist
-    // O_WRONLY: write-only
-    // O_BINARY: don't let Windows silently translate \n <-> \r\n on us
     fd_ = _open(
         filePath_.c_str(),
         O_APPEND | O_CREAT | O_WRONLY | O_BINARY,
@@ -87,12 +43,10 @@ void WriteAheadLog::appendLine(const std::string& line) {
         throw std::runtime_error("WAL write failed or was incomplete: " + filePath_);
     }
 
-    // Force the OS to flush this out of the page cache and onto physical disk.
     if (_commit(fd_) != 0) {
         throw std::runtime_error("WAL commit (fsync) failed: " + filePath_);
     }
 }
-
 
 void WriteAheadLog::replay(
     const std::function<void(const std::string&, const std::string&)>& onSet,
@@ -100,7 +54,7 @@ void WriteAheadLog::replay(
 ) {
     std::ifstream in(filePath_);
     if (!in.is_open()) {
-        return;  // no existing WAL file yet — nothing to replay
+        return;
     }
 
     std::string line;
@@ -123,6 +77,5 @@ void WriteAheadLog::replay(
                 onDelete(key);
             }
         }
-        // Any malformed/partial line (e.g. from a crash mid-write) is silently skipped.
     }
 }

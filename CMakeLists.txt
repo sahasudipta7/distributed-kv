@@ -12,6 +12,15 @@ add_executable(distributed_kv
     src/wal.cpp
 )
 
+add_executable(kv_server
+    src/server_main.cpp
+    src/server.cpp
+    src/kv_store.cpp
+    src/command.cpp
+    src/wal.cpp
+)
+target_link_libraries(kv_server ws2_32)
+
 # ---- Tests ----
 include(FetchContent)
 FetchContent_Declare(
