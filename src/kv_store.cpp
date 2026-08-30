@@ -2,6 +2,15 @@
 
 KVStore::KVStore(const std::string& walPath)
     : wal_(walPath) {
+    // Rebuild in-memory state from the WAL before accepting new commands.
+    wal_.replay(
+        [this](const std::string& key, const std::string& value) {
+            store_[key] = value;
+        },
+        [this](const std::string& key) {
+            store_.erase(key);
+        }
+    );
 }
 
 void KVStore::put(const std::string& key, const std::string& value) {
