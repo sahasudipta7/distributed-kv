@@ -1,30 +1,61 @@
 #include "server.h"
+#include "command.h"
 #include <iostream>
 #include <stdexcept>
+#include <string>
 
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #pragma comment(lib, "ws2_32.lib")
 
+// Windows headers #define DELETE as a numeric macro (used for file/registry
+// access rights), which collides with our CommandType::DELETE enum value.
+// Undefine it so our enum can compile normally.
+#ifdef DELETE
+#undef DELETE
+#endif
+
 Server::Server(int port, KVStore& store)
     : port_(port), store_(store) {
 }
 
+// Reads from the socket until it hits a newline, returns the line (without \r\n).
+static std::string recvLine(SOCKET clientSocket) {
+    std::string line;
+    char ch;
+    while (true) {
+        int result = recv(clientSocket, &ch, 1, 0);
+        if (result <= 0) {
+            // 0 = client disconnected, <0 = error
+            return "";
+        }
+        if (ch == '\n') {
+            break;
+        }
+        if (ch != '\r') {
+            line += ch;
+        }
+    }
+    return line;
+}
+
+static void sendLine(SOCKET clientSocket, const std::string& line) {
+    std::string toSend = line + "\n";
+    send(clientSocket, toSend.c_str(), static_cast<int>(toSend.size()), 0);
+}
+
 void Server::run() {
-    // 1. Initialize Winsock (Windows-specific requirement)
     WSADATA wsaData;
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
         throw std::runtime_error("WSAStartup failed");
     }
 
-    // 2. Create a socket
     SOCKET listenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (listenSocket == INVALID_SOCKET) {
         WSACleanup();
         throw std::runtime_error("socket() failed");
     }
 
-    // 3. Bind it to the given port, on all local interfaces
     sockaddr_in serverAddr{};
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_addr.s_addr = INADDR_ANY;
@@ -36,7 +67,6 @@ void Server::run() {
         throw std::runtime_error("bind() failed");
     }
 
-    // 4. Start listening for connections
     if (listen(listenSocket, SOMAXCONN) == SOCKET_ERROR) {
         closesocket(listenSocket);
         WSACleanup();
@@ -45,18 +75,55 @@ void Server::run() {
 
     std::cout << "Server listening on port " << port_ << "..." << std::endl;
 
-    // 5. Accept ONE client connection (proof of concept — loop comes later)
-    SOCKET clientSocket = accept(listenSocket, nullptr, nullptr);
-    if (clientSocket == INVALID_SOCKET) {
-        closesocket(listenSocket);
-        WSACleanup();
-        throw std::runtime_error("accept() failed");
+    // Outer loop: accept clients one at a time, forever.
+    while (true) {
+        SOCKET clientSocket = accept(listenSocket, nullptr, nullptr);
+        if (clientSocket == INVALID_SOCKET) {
+            std::cerr << "accept() failed, continuing..." << std::endl;
+            continue;
+        }
+
+        std::cout << "Client connected!" << std::endl;
+
+        // Inner loop: handle commands from this client until they disconnect.
+        while (true) {
+            std::string line = recvLine(clientSocket);
+            if (line.empty()) {
+                // Could be a real disconnect, or an empty line — for now treat
+                // recv() returning 0/error (handled inside recvLine) as disconnect.
+                break;
+            }
+
+            Command cmd = parseCommand(line);
+
+            switch (cmd.type) {
+                case CommandType::SET:
+                    store_.put(cmd.key, cmd.value);
+                    sendLine(clientSocket, "OK");
+                    break;
+                case CommandType::GET: {
+                    auto val = store_.get(cmd.key);
+                    sendLine(clientSocket, val ? *val : "NOT_FOUND");
+                    break;
+                }
+                case CommandType::DELETE:
+                    store_.remove(cmd.key);
+                    sendLine(clientSocket, "OK");
+                    break;
+                case CommandType::INVALID:
+                    sendLine(clientSocket, "ERROR: missing arguments");
+                    break;
+                case CommandType::UNKNOWN:
+                    sendLine(clientSocket, "ERROR: unknown command");
+                    break;
+            }
+        }
+
+        std::cout << "Client disconnected." << std::endl;
+        closesocket(clientSocket);
     }
 
-    std::cout << "Client connected!" << std::endl;
-
-    // TEMPORARY: just close the connection immediately, proving accept() worked
-    closesocket(clientSocket);
     closesocket(listenSocket);
     WSACleanup();
 }
+

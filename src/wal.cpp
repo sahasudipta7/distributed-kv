@@ -79,3 +79,4 @@ void WriteAheadLog::replay(
         }
     }
 }
+

@@ -12,6 +12,11 @@ add_executable(distributed_kv
     src/wal.cpp
 )
 
+add_executable(kv_client
+    src/test_client.cpp
+)
+target_link_libraries(kv_client ws2_32)
+
 add_executable(kv_server
     src/server_main.cpp
     src/server.cpp
