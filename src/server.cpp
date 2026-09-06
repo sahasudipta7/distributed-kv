@@ -3,14 +3,12 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <thread>
 
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #pragma comment(lib, "ws2_32.lib")
 
-// Windows headers #define DELETE as a numeric macro (used for file/registry
-// access rights), which collides with our CommandType::DELETE enum value.
-// Undefine it so our enum can compile normally.
 #ifdef DELETE
 #undef DELETE
 #endif
@@ -19,14 +17,12 @@ Server::Server(int port, KVStore& store)
     : port_(port), store_(store) {
 }
 
-// Reads from the socket until it hits a newline, returns the line (without \r\n).
 static std::string recvLine(SOCKET clientSocket) {
     std::string line;
     char ch;
     while (true) {
         int result = recv(clientSocket, &ch, 1, 0);
         if (result <= 0) {
-            // 0 = client disconnected, <0 = error
             return "";
         }
         if (ch == '\n') {
@@ -42,6 +38,47 @@ static std::string recvLine(SOCKET clientSocket) {
 static void sendLine(SOCKET clientSocket, const std::string& line) {
     std::string toSend = line + "\n";
     send(clientSocket, toSend.c_str(), static_cast<int>(toSend.size()), 0);
+}
+
+// Runs on its own thread — handles one client's commands until they disconnect.
+static void handleClient(SOCKET clientSocket, KVStore& store) {
+    std::cout << "Client connected! (thread "
+              << std::this_thread::get_id() << ")" << std::endl;
+
+    while (true) {
+        std::string line = recvLine(clientSocket);
+        if (line.empty()) {
+            break;
+        }
+
+        Command cmd = parseCommand(line);
+
+        switch (cmd.type) {
+            case CommandType::SET:
+                store.put(cmd.key, cmd.value);
+                sendLine(clientSocket, "OK");
+                break;
+            case CommandType::GET: {
+                auto val = store.get(cmd.key);
+                sendLine(clientSocket, val ? *val : "NOT_FOUND");
+                break;
+            }
+            case CommandType::DELETE:
+                store.remove(cmd.key);
+                sendLine(clientSocket, "OK");
+                break;
+            case CommandType::INVALID:
+                sendLine(clientSocket, "ERROR: missing arguments");
+                break;
+            case CommandType::UNKNOWN:
+                sendLine(clientSocket, "ERROR: unknown command");
+                break;
+        }
+    }
+
+    std::cout << "Client disconnected. (thread "
+              << std::this_thread::get_id() << ")" << std::endl;
+    closesocket(clientSocket);
 }
 
 void Server::run() {
@@ -75,7 +112,6 @@ void Server::run() {
 
     std::cout << "Server listening on port " << port_ << "..." << std::endl;
 
-    // Outer loop: accept clients one at a time, forever.
     while (true) {
         SOCKET clientSocket = accept(listenSocket, nullptr, nullptr);
         if (clientSocket == INVALID_SOCKET) {
@@ -83,47 +119,12 @@ void Server::run() {
             continue;
         }
 
-        std::cout << "Client connected!" << std::endl;
-
-        // Inner loop: handle commands from this client until they disconnect.
-        while (true) {
-            std::string line = recvLine(clientSocket);
-            if (line.empty()) {
-                // Could be a real disconnect, or an empty line — for now treat
-                // recv() returning 0/error (handled inside recvLine) as disconnect.
-                break;
-            }
-
-            Command cmd = parseCommand(line);
-
-            switch (cmd.type) {
-                case CommandType::SET:
-                    store_.put(cmd.key, cmd.value);
-                    sendLine(clientSocket, "OK");
-                    break;
-                case CommandType::GET: {
-                    auto val = store_.get(cmd.key);
-                    sendLine(clientSocket, val ? *val : "NOT_FOUND");
-                    break;
-                }
-                case CommandType::DELETE:
-                    store_.remove(cmd.key);
-                    sendLine(clientSocket, "OK");
-                    break;
-                case CommandType::INVALID:
-                    sendLine(clientSocket, "ERROR: missing arguments");
-                    break;
-                case CommandType::UNKNOWN:
-                    sendLine(clientSocket, "ERROR: unknown command");
-                    break;
-            }
-        }
-
-        std::cout << "Client disconnected." << std::endl;
-        closesocket(clientSocket);
+        // Spawn a dedicated thread for this client, then immediately loop
+        // back to accept() so the next client isn't blocked.
+        std::thread clientThread(handleClient, clientSocket, std::ref(store_));
+        clientThread.detach();
     }
 
     closesocket(listenSocket);
     WSACleanup();
 }
-
