@@ -4,7 +4,12 @@
 #include <ws2tcpip.h>
 #pragma comment(lib, "ws2_32.lib")
 
-int main() {
+int main(int argc, char* argv[]) {
+    int port = 6380;
+    if (argc >= 2) {
+        port = std::atoi(argv[1]);
+    }
+
     WSADATA wsaData;
     WSAStartup(MAKEWORD(2, 2), &wsaData);
 
@@ -12,15 +17,15 @@ int main() {
 
     sockaddr_in serverAddr{};
     serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(6380);
+    serverAddr.sin_port = htons(static_cast<u_short>(port));
     inet_pton(AF_INET, "127.0.0.1", &serverAddr.sin_addr);
 
     if (connect(sock, reinterpret_cast<sockaddr*>(&serverAddr), sizeof(serverAddr)) == SOCKET_ERROR) {
-        std::cerr << "connect() failed" << std::endl;
+        std::cerr << "connect() failed on port " << port << std::endl;
         return 1;
     }
 
-    std::cout << "Connected to server. Type commands (Ctrl+C to quit):" << std::endl;
+    std::cout << "Connected to server on port " << port << ". Type commands (Ctrl+C to quit):" << std::endl;
 
     std::string line;
     while (std::getline(std::cin, line)) {
