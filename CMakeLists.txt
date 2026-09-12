@@ -43,6 +43,7 @@ add_executable(kv_tests
     src/kv_store.cpp
     src/command.cpp
     src/wal.cpp
+    src/raft_state.cpp
 )
 target_link_libraries(kv_tests gtest_main)
 
