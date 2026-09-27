@@ -40,10 +40,12 @@ enable_testing()
 
 add_executable(kv_tests
     tests/kv_store_test.cpp
+    tests/raft_state_test.cpp
     src/kv_store.cpp
     src/command.cpp
     src/wal.cpp
     src/raft_state.cpp
+    src/election_timer.cpp
 )
 target_link_libraries(kv_tests gtest_main)
 

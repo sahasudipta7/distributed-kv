@@ -1,6 +1,44 @@
 #include <gtest/gtest.h>
 #include "../src/raft_state.h"
 
+#include "../src/election_timer.h"
+#include <iostream>
+#include <chrono>
+
+TEST(ElectionTimerTest, FiresAfterTimeout) {
+    std::atomic<bool> fired(false);
+
+    ElectionTimer timer(100, 150, [&fired]() {
+        fired = true;
+    });
+
+    timer.start();
+    std::this_thread::sleep_for(std::chrono::milliseconds(250));
+    timer.stop();
+
+    ASSERT_TRUE(fired);
+}
+
+TEST(ElectionTimerTest, ResetPreventsTimeout) {
+    std::atomic<int> fireCount(0);
+
+    ElectionTimer timer(100, 150, [&fireCount]() {
+        fireCount++;
+    });
+
+    timer.start();
+
+    // Keep resetting faster than the timeout, for 300ms total
+    for (int i = 0; i < 6; ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        timer.reset();
+    }
+
+    timer.stop();
+
+    ASSERT_EQ(fireCount, 0);  // should never have fired, we kept resetting it
+}
+
 TEST(RaftStateTest, StartsAsFollowerWithTermZero) {
     RaftState state(1);
     ASSERT_EQ(state.getRole(), NodeRole::FOLLOWER);
