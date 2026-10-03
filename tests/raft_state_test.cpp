@@ -5,6 +5,22 @@
 #include <iostream>
 #include <chrono>
 
+#include "../src/raft_node.h"
+
+TEST(RaftNodeTest, TimeoutTriggersCandidateTransition) {
+    RaftNode node(1);
+
+    ASSERT_EQ(node.getState().getRole(), NodeRole::FOLLOWER);
+    ASSERT_EQ(node.getState().getCurrentTerm(), 0);
+
+    node.start();
+    std::this_thread::sleep_for(std::chrono::milliseconds(400));  // wait past max timeout
+    node.stop();
+
+    ASSERT_EQ(node.getState().getRole(), NodeRole::CANDIDATE);
+    ASSERT_GE(node.getState().getCurrentTerm(), 1);
+}
+
 TEST(ElectionTimerTest, FiresAfterTimeout) {
     std::atomic<bool> fired(false);
 

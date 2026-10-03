@@ -46,6 +46,7 @@ add_executable(kv_tests
     src/wal.cpp
     src/raft_state.cpp
     src/election_timer.cpp
+    src/raft_node.cpp
 )
 target_link_libraries(kv_tests gtest_main)
 
